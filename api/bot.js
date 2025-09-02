@@ -1,12 +1,14 @@
 const TelegramBot = require('node-telegram-bot-api');
 
+// Проверка наличия токена
+if (!process.env.BOT_TOKEN) {
+  console.error('ERROR: BOT_TOKEN environment variable is not set!');
+  process.exit(1);
+}
+
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: false });
 
-// ID вашей группы обсуждений (замените на реальный)
-const DISCUSSION_GROUP_ID = process.env.DISCUSSION_GROUP_ID || '-1001234567890';
-
-// Текст комментария с правилами
 const rulesText = `⚠️ **Краткие правила комментариев:**
 
 • Спам категорически запрещён.
@@ -15,16 +17,16 @@ const rulesText = `⚠️ **Краткие правила комментарие
 • Любая политика или околополитический контент касающийся событий в реальной жизни запрещен.
 • Контент запрещённый к распространению на территории Российской Федерации будет удаляться а участник его запостивший будет заблокирован.
 
-📡 [Наш чат](https://t.me/+qAcLEuOQVbZhYWFi) | [Discord](https://discord.gg/rBnww7ytM3) | [TikTok](https://www.tiktok.com/@spectr_mindustry?_t=ZN-8yZCVx33mr9&_r=1)`;
+📡 [Наш чат](https://t.me/+qAcLEuOQVbZhYWFi) | [Дискорд](https://discord.gg/rBnww7ytM3) | [TikTok](https://www.tiktok.com/@spectr_mindustry?_t=ZN-8yZCVx33mr9&_r=1)`;
 
-// Обработчик входящих сообщений
 module.exports = async (req, res) => {
   try {
-    // Всегда сначала отвечаем Telegram, чтобы не было таймаута
-    res.status(200).send('OK');
-    
+    // Проверяем метод запроса
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
     const update = req.body;
-    console.log('Received update:', JSON.stringify(update));
     
     // Обработка личных сообщений
     if (update.message && update.message.chat.type === 'private') {
@@ -32,48 +34,45 @@ module.exports = async (req, res) => {
       const messageText = update.message.text;
 
       if (messageText === '/test') {
-        await bot.sendMessage(chatId, '✅ Бот работает и готов к работе!');
-        return;
+        await bot.sendMessage(chatId, '✅ Бот работает и готов к работе!', {
+          disable_web_page_preview: true
+        });
+        return res.status(200).send('OK');
       }
       
       if (messageText === '/start') {
         await bot.sendMessage(
           chatId,
-          '👋 Привет! К сожалению, я не отвечаю на личные сообщения.\n\nЯ — автоматический бот для канала @spektrminda. Моя задача — добавлять комментарии с правилами под каждым постом в том канале.\n\nПодписывайся на канал, чтобы видеть меня в действии! 😊'
+          '👋 Привет! К сожалению, я не отвечаю на личные сообщения.\n\nЯ — автоматический бот для канала @spektrminda.',
+          { disable_web_page_preview: true }
         );
-        return;
+        return res.status(200).send('OK');
       }
-      
-      return;
     }
 
-    // Обработка сообщений в группе обсуждений
-    if (update.message && update.message.chat.id.toString() === DISCUSSION_GROUP_ID.toString()) {
-      const message = update.message;
-      
-      // Проверяем, является ли сообщение автоматически пересланным из канала
-      if (message.forward_from_chat && message.forward_from_chat.username === 'spektrminda') {
-        console.log('New post from channel detected in discussion group');
-        
+    // Обработка постов в канале
+    if (update.channel_post) {
+      const chatId = update.channel_post.chat.id;
+      const messageId = update.channel_post.message_id;
+      const channelUsername = update.channel_post.chat.username;
+
+      // Проверяем, что это нужный канал
+      if (channelUsername === 'spektrminda') {
         try {
-          // Отправляем комментарий как ответ на пересланное сообщение
-          await bot.sendMessage(DISCUSSION_GROUP_ID, rulesText, {
+          await bot.sendMessage(chatId, rulesText, {
             parse_mode: 'Markdown',
-            reply_to_message_id: message.message_id
+            reply_to_message_id: messageId,
             disable_web_page_preview: true
           });
-          console.log('Comment successfully added to the discussion');
         } catch (error) {
-          console.error('Error sending comment to discussion:', error.message);
+          console.error('Error sending message:', error.message);
         }
       }
     }
 
-    // Обработка постов в канале (на всякий случай оставляем)
-    if (update.channel_post) {
-      console.log('Channel post detected, but comments should be in discussion group');
-    }
+    res.status(200).send('OK');
   } catch (error) {
-    console.error('General error in handler:', error);
+    console.error('Unhandled error:', error);
+    res.status(500).send('Internal Server Error');
   }
 };
