@@ -1,10 +1,15 @@
 const TelegramBot = require('node-telegram-bot-api');
 
+// Проверка наличия обязательных переменных окружения
+if (!process.env.BOT_TOKEN) {
+  console.error('ERROR: BOT_TOKEN environment variable is not set!');
+}
+
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: false });
 
-// ID вашей группы обсуждений
-const DISCUSSION_GROUP_ID = process.env.DISCUSSION_GROUP_ID || '-1001234567890';
+// Получаем ID группы обсуждений из переменных окружения
+const DISCUSSION_GROUP_ID = process.env.DISCUSSION_GROUP_ID;
 
 // Текст комментария с правилами
 const rulesText = `⚠️ **Краткие правила комментариев:**
@@ -23,38 +28,57 @@ module.exports = async (req, res) => {
     // Всегда сначала отвечаем Telegram, чтобы не было таймаута
     res.status(200).send('OK');
     
+    // Проверяем метод запроса
+    if (req.method !== 'POST') {
+      console.log('Received non-POST request');
+      return;
+    }
+    
     const update = req.body;
-    console.log('Received update:', JSON.stringify(update));
+    
+    // Проверяем наличие тела запроса
+    if (!update) {
+      console.log('No update received');
+      return;
+    }
+    
+    console.log('Received update type:', update.message ? 'message' : update.channel_post ? 'channel_post' : 'unknown');
     
     // Обработка личных сообщений
     if (update.message && update.message.chat.type === 'private') {
       const chatId = update.message.chat.id;
       const messageText = update.message.text;
 
-      if (messageText === '/test') {
-        await bot.sendMessage(chatId, '✅ Бот работает и готов к работе!', {
-          disable_web_page_preview: true
-        });
-        return;
-      }
-      
-      if (messageText === '/start') {
-        await bot.sendMessage(
-          chatId,
-          '👋 Привет! К сожалению, я не отвечаю на личные сообщения.\n\nЯ — автоматический бот для канала @spektrminda. Моя задача — добавлять комментарии с правилами под каждым постом в том канале.\n\nПодписывайся на канал, чтобы видеть меня в действии! 😊',
-          {
+      try {
+        if (messageText === '/test') {
+          await bot.sendMessage(chatId, '✅ Бот работает и готов к работе!', {
             disable_web_page_preview: true
-          }
-        );
-        return;
+          });
+          console.log('Responded to /test command');
+          return;
+        }
+        
+        if (messageText === '/start') {
+          await bot.sendMessage(
+            chatId,
+            '👋 Привет! К сожалению, я не отвечаю на личные сообщения.\n\nЯ — автоматический бот для канала @spektrminda. Моя задача — добавлять комментарии с правилами под каждым постом в том канале.\n\nПодписывайся на канал, чтобы видеть меня в действии! 😊',
+            { disable_web_page_preview: true }
+          );
+          console.log('Responded to /start command');
+          return;
+        }
+        
+        console.log('Received unknown command in private chat:', messageText);
+      } catch (error) {
+        console.error('Error processing private message:', error.message);
       }
-      
       return;
     }
 
     // Обработка сообщений в группе обсуждений
-    if (update.message) {
-      console.log('Message received in chat:', update.message.chat.id, 'type:', update.message.chat.type);
+    if (update.message && DISCUSSION_GROUP_ID) {
+      console.log('Message received in chat ID:', update.message.chat.id);
+      console.log('Expected discussion group ID:', DISCUSSION_GROUP_ID);
       
       // Проверяем, что сообщение пришло из нужной группы
       if (update.message.chat.id.toString() === DISCUSSION_GROUP_ID.toString()) {
@@ -79,13 +103,17 @@ module.exports = async (req, res) => {
             } catch (error) {
               console.error('Error sending comment to discussion:', error.message);
             }
+          } else {
+            console.log('Message forwarded from different channel:', message.forward_from_chat.username);
           }
         } else {
           console.log('Message is not forwarded from a channel');
         }
       } else {
-        console.log('Message is not from discussion group. Expected:', DISCUSSION_GROUP_ID, 'Got:', update.message.chat.id);
+        console.log('Message is not from discussion group');
       }
+    } else if (!DISCUSSION_GROUP_ID) {
+      console.log('DISCUSSION_GROUP_ID environment variable is not set');
     }
 
     // Обработка постов в канале
