@@ -1,7 +1,7 @@
 {
-  "name": "spectr-bot",
+  "name": "telegram-comment-bot",
   "version": "1.0.0",
-  "description": "Telegram bot for auto-commenting rules",
+  "description": "Telegram bot for auto-commenting rules under posts in @spektrminda channel",
   "main": "api/bot.js",
   "dependencies": {
     "node-telegram-bot-api": "^0.61.0"
