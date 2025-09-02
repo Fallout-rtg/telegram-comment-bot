@@ -28,12 +28,6 @@ module.exports = async (req, res) => {
     // Всегда сначала отвечаем Telegram, чтобы не было таймаута
     res.status(200).send('OK');
     
-    // Проверяем метод запроса
-    if (req.method !== 'POST') {
-      console.log('Received non-POST request');
-      return;
-    }
-    
     const update = req.body;
     
     // Проверяем наличие тела запроса
@@ -42,75 +36,74 @@ module.exports = async (req, res) => {
       return;
     }
     
-    console.log('Received update:', JSON.stringify(update));
-    
+    console.log('Received update type:', update.message ? 'message' : update.channel_post ? 'channel_post' : 'unknown');
+
     // Обработка личных сообщений
     if (update.message && update.message.chat.type === 'private') {
-      console.log('Processing private message');
       const chatId = update.message.chat.id;
       const messageText = update.message.text;
 
-      try {
-        if (messageText === '/test') {
-          console.log('Received /test command');
+      console.log('Processing private message');
+      
+      if (messageText === '/test') {
+        console.log('Received /test command');
+        try {
           await bot.sendMessage(chatId, '✅ Бот работает и готов к работе!', {
             disable_web_page_preview: true
           });
           console.log('Responded to /test command');
-          return;
+        } catch (error) {
+          console.error('Error sending response to /test:', error.message);
         }
-        
-        if (messageText === '/start') {
-          console.log('Received /start command');
+        return;
+      }
+      
+      if (messageText === '/start') {
+        console.log('Received /start command');
+        try {
           await bot.sendMessage(
             chatId,
             '👋 Привет! К сожалению, я не отвечаю на личные сообщения.\n\nЯ — автоматический бот для канала @spektrminda. Моя задача — добавлять комментарии с правилами под каждым постом в том канале.\n\nПодписывайся на канал, чтобы видеть меня в действии! 😊',
             { disable_web_page_preview: true }
           );
           console.log('Responded to /start command');
-          return;
+        } catch (error) {
+          console.error('Error sending response to /start:', error.message);
         }
-        
-        console.log('Received unknown command in private chat:', messageText);
-      } catch (error) {
-        console.error('Error processing private message:', error.message);
+        return;
       }
+      
+      console.log('Received unknown command in private chat:', messageText);
       return;
     }
 
     // Обработка сообщений в группе обсуждений
     if (update.message && DISCUSSION_GROUP_ID) {
-      console.log('Message received in chat ID:', update.message.chat.id);
+      const message = update.message;
+      const chatId = message.chat.id;
+      
+      console.log('Message received in chat:', chatId);
       console.log('Expected discussion group ID:', DISCUSSION_GROUP_ID);
       
-      // Проверяем, что сообщение пришло из нужной группы
-      if (update.message.chat.id.toString() === DISCUSSION_GROUP_ID.toString()) {
-        console.log('Message is from discussion group');
-        const message = update.message;
-        
+      // Проверяем, что сообщение пришло из правильной группы
+      if (chatId.toString() === DISCUSSION_GROUP_ID.toString()) {
         // Проверяем, является ли сообщение автоматически пересланным из канала
-        if (message.forward_from_chat) {
-          console.log('Message is forwarded from chat:', message.forward_from_chat.username);
+        if (message.forward_from_chat && message.forward_from_chat.username === 'spektrminda') {
+          console.log('New post from channel detected in discussion group');
           
-          if (message.forward_from_chat.username === 'spektrminda') {
-            console.log('New post from @spektrminda detected in discussion group');
-            
-            try {
-              // Отправляем комментарий как ответ на пересланное сообщение
-              await bot.sendMessage(DISCUSSION_GROUP_ID, rulesText, {
-                parse_mode: 'Markdown',
-                reply_to_message_id: message.message_id,
-                disable_web_page_preview: true
-              });
-              console.log('Comment successfully added to the discussion');
-            } catch (error) {
-              console.error('Error sending comment to discussion:', error.message);
-            }
-          } else {
-            console.log('Message forwarded from different channel:', message.forward_from_chat.username);
+          try {
+            // Отправляем комментарий как ответ на пересланное сообщение
+            await bot.sendMessage(DISCUSSION_GROUP_ID, rulesText, {
+              parse_mode: 'Markdown',
+              reply_to_message_id: message.message_id,
+              disable_web_page_preview: true
+            });
+            console.log('Comment successfully added to the discussion');
+          } catch (error) {
+            console.error('Error sending comment to discussion:', error.message);
           }
         } else {
-          console.log('Message is not forwarded from a channel');
+          console.log('Message is not forwarded from @spektrminda channel');
         }
       } else {
         console.log('Message is not from discussion group');
