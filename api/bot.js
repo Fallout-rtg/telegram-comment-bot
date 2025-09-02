@@ -60,6 +60,7 @@ module.exports = async (req, res) => {
           await bot.sendMessage(DISCUSSION_GROUP_ID, rulesText, {
             parse_mode: 'Markdown',
             reply_to_message_id: message.message_id
+            disable_web_page_preview: true
           });
           console.log('Comment successfully added to the discussion');
         } catch (error) {
