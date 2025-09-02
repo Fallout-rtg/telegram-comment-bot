@@ -29,11 +29,12 @@ function parseMessageLink(link) {
     const pathParts = url.pathname.split('/').filter(part => part);
     
     if (pathParts[0] === 'c' && pathParts.length >= 3) {
-      const chatId = parseInt(pathParts[1]);
+      const chatId = pathParts[1]; // Оставляем как строку
       const messageId = parseInt(pathParts[2]);
       
+      // Правильное преобразование ID чата
       return {
-        chatId: -1000000000000 + chatId, // Преобразуем в формат -100XXXXXXXXXX
+        chatId: parseInt('-100' + chatId), // Формируем корректный ID супергруппы
         messageId: messageId
       };
     }
