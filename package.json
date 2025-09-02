@@ -1,0 +1,12 @@
+{
+  "name": "spectr-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for auto-commenting rules",
+  "main": "api/bot.js",
+  "dependencies": {
+    "node-telegram-bot-api": "^0.61.0"
+  },
+  "scripts": {
+    "start": "node api/bot.js"
+  }
+}
