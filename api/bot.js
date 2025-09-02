@@ -3,7 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: false });
 
-// ID вашей группы обсуждений (замените на реальный)
+// ID вашей группы обсуждений
 const DISCUSSION_GROUP_ID = process.env.DISCUSSION_GROUP_ID || '-1001234567890';
 
 // Текст комментария с правилами
@@ -33,7 +33,7 @@ module.exports = async (req, res) => {
 
       if (messageText === '/test') {
         await bot.sendMessage(chatId, '✅ Бот работает и готов к работе!', {
-          disable_web_page_preview: true // Отключаем предпросмотр ссылок
+          disable_web_page_preview: true
         });
         return;
       }
@@ -43,7 +43,7 @@ module.exports = async (req, res) => {
           chatId,
           '👋 Привет! К сожалению, я не отвечаю на личные сообщения.\n\nЯ — автоматический бот для канала @spektrminda. Моя задача — добавлять комментарии с правилами под каждым постом в том канале.\n\nПодписывайся на канал, чтобы видеть меня в действии! 😊',
           {
-            disable_web_page_preview: true // Отключаем предпросмотр ссылок
+            disable_web_page_preview: true
           }
         );
         return;
@@ -53,28 +53,42 @@ module.exports = async (req, res) => {
     }
 
     // Обработка сообщений в группе обсуждений
-    if (update.message && update.message.chat.id.toString() === DISCUSSION_GROUP_ID.toString()) {
-      const message = update.message;
+    if (update.message) {
+      console.log('Message received in chat:', update.message.chat.id, 'type:', update.message.chat.type);
       
-      // Проверяем, является ли сообщение автоматически пересланным из канала
-      if (message.forward_from_chat && message.forward_from_chat.username === 'spektrminda') {
-        console.log('New post from channel detected in discussion group');
+      // Проверяем, что сообщение пришло из нужной группы
+      if (update.message.chat.id.toString() === DISCUSSION_GROUP_ID.toString()) {
+        console.log('Message is from discussion group');
+        const message = update.message;
         
-        try {
-          // Отправляем комментарий как ответ на пересланное сообщение
-          await bot.sendMessage(DISCUSSION_GROUP_ID, rulesText, {
-            parse_mode: 'Markdown',
-            reply_to_message_id: message.message_id,
-            disable_web_page_preview: true // Отключаем предпросмотр ссылок [citation:1][citation:2]
-          });
-          console.log('Comment successfully added to the discussion');
-        } catch (error) {
-          console.error('Error sending comment to discussion:', error.message);
+        // Проверяем, является ли сообщение автоматически пересланным из канала
+        if (message.forward_from_chat) {
+          console.log('Message is forwarded from chat:', message.forward_from_chat.username);
+          
+          if (message.forward_from_chat.username === 'spektrminda') {
+            console.log('New post from @spektrminda detected in discussion group');
+            
+            try {
+              // Отправляем комментарий как ответ на пересланное сообщение
+              await bot.sendMessage(DISCUSSION_GROUP_ID, rulesText, {
+                parse_mode: 'Markdown',
+                reply_to_message_id: message.message_id,
+                disable_web_page_preview: true
+              });
+              console.log('Comment successfully added to the discussion');
+            } catch (error) {
+              console.error('Error sending comment to discussion:', error.message);
+            }
+          }
+        } else {
+          console.log('Message is not forwarded from a channel');
         }
+      } else {
+        console.log('Message is not from discussion group. Expected:', DISCUSSION_GROUP_ID, 'Got:', update.message.chat.id);
       }
     }
 
-    // Обработка постов в канале (на всякий случай оставляем)
+    // Обработка постов в канале
     if (update.channel_post) {
       console.log('Channel post detected, but comments should be in discussion group');
     }
