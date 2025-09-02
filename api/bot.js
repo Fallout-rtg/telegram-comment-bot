@@ -42,15 +42,17 @@ module.exports = async (req, res) => {
       return;
     }
     
-    console.log('Received update type:', update.message ? 'message' : update.channel_post ? 'channel_post' : 'unknown');
+    console.log('Received update:', JSON.stringify(update));
     
     // Обработка личных сообщений
     if (update.message && update.message.chat.type === 'private') {
+      console.log('Processing private message');
       const chatId = update.message.chat.id;
       const messageText = update.message.text;
 
       try {
         if (messageText === '/test') {
+          console.log('Received /test command');
           await bot.sendMessage(chatId, '✅ Бот работает и готов к работе!', {
             disable_web_page_preview: true
           });
@@ -59,6 +61,7 @@ module.exports = async (req, res) => {
         }
         
         if (messageText === '/start') {
+          console.log('Received /start command');
           await bot.sendMessage(
             chatId,
             '👋 Привет! К сожалению, я не отвечаю на личные сообщения.\n\nЯ — автоматический бот для канала @spektrminda. Моя задача — добавлять комментарии с правилами под каждым постом в том канале.\n\nПодписывайся на канал, чтобы видеть меня в действии! 😊',
