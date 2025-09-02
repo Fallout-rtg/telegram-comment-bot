@@ -22,6 +22,28 @@ const rulesText = `⚠️ **Краткие правила комментарие
 
 📡 [Наш чат](https://t.me/+qAcLEuOQVbZhYWFi) | [Discord](https://discord.gg/rBnww7ytM3) | [TikTok](https://www.tiktok.com/@spectr_mindustry?_t=ZN-8yZCVx33mr9&_r=1)`;
 
+// Функция для извлечения информации из ссылки на сообщение
+function parseMessageLink(link) {
+  try {
+    const url = new URL(link);
+    const pathParts = url.pathname.split('/').filter(part => part);
+    
+    if (pathParts[0] === 'c' && pathParts.length >= 3) {
+      const chatId = parseInt(pathParts[1]);
+      const messageId = parseInt(pathParts[2]);
+      
+      return {
+        chatId: -1000000000000 + chatId, // Преобразуем в формат -100XXXXXXXXXX
+        messageId: messageId
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error('Error parsing message link:', error);
+    return null;
+  }
+}
+
 // Обработчик входящих сообщений
 module.exports = async (req, res) => {
   try {
@@ -71,6 +93,46 @@ module.exports = async (req, res) => {
           console.error('Error sending response to /start:', error.message);
         }
         return;
+      }
+      
+      // Обработка ссылки на сообщение и ответа
+      const lines = messageText.split('\n');
+      if (lines.length >= 2) {
+        const link = lines[0].trim();
+        const replyText = lines.slice(1).join('\n').trim();
+        
+        // Проверяем, является ли первая строка ссылкой на сообщение Telegram
+        if (link.startsWith('https://t.me/c/')) {
+          const messageInfo = parseMessageLink(link);
+          
+          if (messageInfo && replyText) {
+            try {
+              console.log('Attempting to reply to message:', messageInfo);
+              
+              // Отправляем ответ на сообщение
+              await bot.sendMessage(messageInfo.chatId, replyText, {
+                reply_to_message_id: messageInfo.messageId,
+                disable_web_page_preview: true
+              });
+              
+              await bot.sendMessage(chatId, '✅ Ответ успешно отправлен!', {
+                disable_web_page_preview: true
+              });
+              
+            } catch (error) {
+              console.error('Error sending reply:', error);
+              await bot.sendMessage(
+                chatId, 
+                '❌ Не удалось отправить ответ. Проверьте, что:\n' +
+                '1. Бот добавлен в группу как администратор\n' +
+                '2. Бот имеет права на отправку сообщений\n' +
+                '3. Ссылка корректна',
+                { disable_web_page_preview: true }
+              );
+            }
+            return;
+          }
+        }
       }
       
       console.log('Received unknown command in private chat:', messageText);
