@@ -1,6 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
 
-// Проверка наличия обязательных переменных окружения
 if (!process.env.BOT_TOKEN) {
   console.error('ERROR: BOT_TOKEN environment variable is not set!');
 }
