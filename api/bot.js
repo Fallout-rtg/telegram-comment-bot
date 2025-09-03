@@ -243,30 +243,46 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Обработка сообщений в группе обсуждений (резервный вариант)
+    // Обработка сообщений в группе обсуждений (альтернативный способ)
     if (update.message && DISCUSSION_GROUP_ID) {
       const message = update.message;
       const chatId = message.chat.id;
       
-      console.log('Message received in chat:', chatId);
-      console.log('Expected discussion group ID:', DISCUSSION_GROUP_ID);
-      
+      // Проверяем, что сообщение пришло из правильной группы
       if (chatId.toString() === DISCUSSION_GROUP_ID.toString()) {
-        if (message.forward_from_chat && message.forward_from_chat.username === 'spektrminda') {
-          console.log('New post from channel detected in discussion group');
+        console.log('Message received in discussion group:', message.text || 'No text content');
+        
+        // Логируем полную структуру сообщения для отладки
+        console.log('Full message structure:', JSON.stringify({
+          has_forward_from_chat: !!message.forward_from_chat,
+          forward_from_chat: message.forward_from_chat,
+          chat: message.chat,
+          text: message.text
+        }, null, 2));
+        
+        // Проверяем, является ли сообщение автоматически пересланным из канала
+        if (message.forward_from_chat) {
+          console.log('Message is forwarded from chat:', message.forward_from_chat.username || message.forward_from_chat.id);
           
-          try {
-            await safeSendMessage(DISCUSSION_GROUP_ID, rulesText, {
-              parse_mode: 'Markdown',
-              reply_to_message_id: message.message_id,
-              disable_web_page_preview: true
-            });
-            console.log('Comment successfully added to the discussion');
-          } catch (error) {
-            console.error('Error sending comment to discussion:', error.message);
+          if (message.forward_from_chat.username === 'spektrminda') {
+            console.log('New post from channel detected in discussion group');
+            
+            try {
+              // Отправляем комментарий как ответ на пересланное сообщение
+              await safeSendMessage(DISCUSSION_GROUP_ID, rulesText, {
+                parse_mode: 'Markdown',
+                reply_to_message_id: message.message_id,
+                disable_web_page_preview: true
+              });
+              console.log('Comment successfully added to the discussion');
+            } catch (error) {
+              console.error('Error sending comment to discussion:', error.message);
+            }
+          } else {
+            console.log('Message is forwarded from different channel:', message.forward_from_chat.username);
           }
         } else {
-          console.log('Message is not forwarded from @spektrminda channel');
+          console.log('Message is not forwarded from any channel');
         }
       } else {
         console.log('Message is not from discussion group');
