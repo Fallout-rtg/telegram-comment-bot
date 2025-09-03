@@ -44,12 +44,11 @@ function parseMessageLink(link) {
     const pathParts = url.pathname.split('/').filter(part => part);
     
     if (pathParts[0] === 'c' && pathParts.length >= 3) {
-      const chatId = pathParts[1]; // Оставляем как строку
+      const chatId = pathParts[1];
       const messageId = parseInt(pathParts[2]);
       
-      // Правильное преобразование ID чата
       return {
-        chatId: parseInt('-100' + chatId), // Формируем корректный ID супергруппы
+        chatId: parseInt('-100' + chatId),
         messageId: messageId
       };
     }
@@ -148,7 +147,6 @@ module.exports = async (req, res) => {
           const link = lines[0].trim();
           const replyText = lines.slice(1).join('\n').trim();
           
-          // Проверяем, является ли первая строка ссылкой на сообщение Telegram
           if (link.startsWith('https://t.me/c/')) {
             const messageInfo = parseMessageLink(link);
             
@@ -156,7 +154,6 @@ module.exports = async (req, res) => {
               try {
                 console.log('Attempting to reply to message:', messageInfo);
                 
-                // Отправляем ответ на сообщение
                 await safeSendMessage(messageInfo.chatId, replyText, {
                   reply_to_message_id: messageInfo.messageId,
                   disable_web_page_preview: true
@@ -186,7 +183,6 @@ module.exports = async (req, res) => {
       
       console.log('Received unknown command in private chat:', messageText);
       
-      // Отправляем подсказку о формате (только для известных пользователей)
       if (userId === KNOWN_USERS.SPECTR || userId === KNOWN_USERS.ADVISOR) {
         try {
           await safeSendMessage(
@@ -206,7 +202,48 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // Обработка сообщений в группе обсуждений
+    // Обработка постов в канале - ОСНОВНАЯ ФУНКЦИЯ БОТА
+    if (update.channel_post) {
+      const chatId = update.channel_post.chat.id;
+      const messageId = update.channel_post.message_id;
+      const channelUsername = update.channel_post.chat.username;
+
+      console.log('Channel post detected in:', channelUsername);
+      
+      // Проверяем, что это нужный канал
+      if (channelUsername === 'spektrminda') {
+        console.log('Post in target channel, attempting to comment...');
+        
+        try {
+          // Отправляем комментарий как ответ на пост
+          await safeSendMessage(chatId, rulesText, {
+            parse_mode: 'Markdown',
+            reply_to_message_id: messageId,
+            disable_web_page_preview: true
+          });
+          console.log('Comment successfully added under the post');
+        } catch (error) {
+          console.error('Error sending comment:', error.message);
+          
+          // Если ошибка связана с правами, попробуем отправить без reply
+          if (error.message.includes('reply') || error.message.includes('rights')) {
+            try {
+              await safeSendMessage(chatId, rulesText, {
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true
+              });
+              console.log('Comment sent without reply');
+            } catch (secondError) {
+              console.error('Error on second attempt:', secondError.message);
+            }
+          }
+        }
+      } else {
+        console.log('Post from another channel:', channelUsername, '. Ignoring.');
+      }
+    }
+
+    // Обработка сообщений в группе обсуждений (резервный вариант)
     if (update.message && DISCUSSION_GROUP_ID) {
       const message = update.message;
       const chatId = message.chat.id;
@@ -214,14 +251,11 @@ module.exports = async (req, res) => {
       console.log('Message received in chat:', chatId);
       console.log('Expected discussion group ID:', DISCUSSION_GROUP_ID);
       
-      // Проверяем, что сообщение пришло из правильной группы
       if (chatId.toString() === DISCUSSION_GROUP_ID.toString()) {
-        // Проверяем, является ли сообщение автоматически пересланным из канала
         if (message.forward_from_chat && message.forward_from_chat.username === 'spektrminda') {
           console.log('New post from channel detected in discussion group');
           
           try {
-            // Отправляем комментарий как ответ на пересланное сообщение
             await safeSendMessage(DISCUSSION_GROUP_ID, rulesText, {
               parse_mode: 'Markdown',
               reply_to_message_id: message.message_id,
@@ -239,11 +273,6 @@ module.exports = async (req, res) => {
       }
     } else if (!DISCUSSION_GROUP_ID) {
       console.log('DISCUSSION_GROUP_ID environment variable is not set');
-    }
-
-    // Обработка постов в канале
-    if (update.channel_post) {
-      console.log('Channel post detected, but comments should be in discussion group');
     }
   } catch (error) {
     console.error('General error in handler:', error);
